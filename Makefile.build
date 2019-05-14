@@ -1,0 +1,26 @@
+#
+# Copyright (c) 2019 Amol Surati
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# GNU Make
+
+$(BIN): $(ELF)
+	$(info oc $@)
+	@$(OC) -O binary $< $@
+
+$(ELF): $(OBJ) $(LDS)
+	$(info ld $@)
+	@$(LD) -T $(LDS) $(LDFLAGS) $(OBJ) -o $@
+
+%.S.o: %.S
+	$(info cc $@)
+	@$(CC) $(CFLAGS) -I$(INC) $(AFLAGS) $< -o $@
+
+%.c.o: %.c
+	$(info cc $@)
+	@$(CC) $(CFLAGS) -I$(INC) $< -o $@
+
+-include $(DEP)
+
+.PHONY: all c
