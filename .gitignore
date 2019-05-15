@@ -1,0 +1,9 @@
+*.o
+*.d
+*.elf
+*.bin
+pkg
+d.txt
+out
+out.*
+
