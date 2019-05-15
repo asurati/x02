@@ -7,10 +7,14 @@
 #define _MMU_H_
 
 #include <cpu.h>
+#include <bits.h>
 
 /* Must match with vmm.ld. */
 #define KVA_BASE			0xc000000000000000ull
 #define PHDRS_BASE			0
+
+#define EA_TO_RA(v)			((uintptr_t)(v) - KVA_BASE)
+#define VA_TO_AVA(v)			((uintptr_t)(v) >> 23)
 
 #define _1KB_BITS			10
 #define _1KB				(1ull << _1KB_BITS)
@@ -32,9 +36,25 @@
 #define _2MB				(1ull << _2MB_BITS)
 #define _2MB_MASK			(_2MB - 1)
 
+#define _256MB_BITS			28
+#define _256MB				(1ull << _256MB_BITS)
+#define _256MB_MASK			(_256MB - 1)
+
 #define _1GB_BITS			30
 #define _1GB				(1ull << _1GB_BITS)
 #define _1GB_MASK			(_1GB - 1)
+
+#define BASE_PGSZ			_64KB
+#define BASE_PGSZ_BITS			_64KB_BITS
+#define BASE_PGSZ_MASK			_64KB_MASK
+
+#define HPTE_VA_HI_L			0
+#define HPTE_VA_HI_R			35
+#define HPTE_VA_LO_L			36
+#define HPTE_VA_LO_R			63
+
+#define HPTE_HASH_L			53
+#define HPTE_HASH_R			63
 
 #define PTCR_PATB_L			4
 #define PTCR_PATB_R			51
@@ -75,13 +95,17 @@
 #define SLB_IX_L			52
 #define SLB_IX_R			63
 
+#define SLB_B_256MB			0
+#define SLB_LP_64KB			1
+
 #define HPTE_AVA_L			12
 #define HPTE_AVA_R			56
 #define HPTE_L_L			61
 #define HPTE_L_R			61
 #define HPTE_H_L			62
-#define HPTE_H_R			63
+#define HPTE_H_R			62
 #define HPTE_V_L			63
+#define HPTE_V_R			63
 
 #define HPTE_PP0_L			0
 #define HPTE_PP0_R			0
@@ -136,6 +160,14 @@ enum {
 
 struct as {
 	uint64_t slbe[2];
+};
+
+struct pte {
+	uint64_t v[2];
+};
+
+struct pteg {
+	struct pte pte[8];
 };
 
 void	mmu_init(struct as *as);
