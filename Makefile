@@ -15,7 +15,7 @@ OC = $(TGT)-objcopy
 OD = $(TGT)-objdump
 
 INC = ./include
-LDFLAGS = -n -nostdlib -nopie
+LDFLAGS = -nostdlib -nopie
 AFLAGS = -mbig
 CFLAGS = -c -MMD -MP -O0 -ansi -pedantic -pedantic-errors		\
 	 -ffreestanding -fno-builtin -fomit-frame-pointer		\
