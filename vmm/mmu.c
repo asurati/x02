@@ -9,11 +9,81 @@
 #include <mmu.h>
 #include <vmm.h>
 
+/*
+ * Since we fixed HTABSIZE to 0, the hash function contributes the
+ * minimum 11-bits, and we can ignore the AND-ADD operations.
+ */
+
+static uint64_t mmu_va_to_hash(uint64_t va)
+{
+	uint64_t hi, lo, hash;
+
+	hi = bits_get(va, HPTE_VA_HI);
+	lo = bits_get(va, HPTE_VA_LO);
+	lo >>= BASE_PGSZ_BITS;
+	hash = hi ^ lo;
+	hash = bits_get(hash, HPTE_HASH);
+	return hash;
+}
+
+static void mmu_init_map(uint64_t va, size_t sz, int rwx)
+{
+	uint64_t hash, v, a, b, ava;
+	struct pteg *pteg;
+	struct pte *pte;
+	extern char htaborg;
+	int i;
+
+	/* We attempt to create one PTE for each block of size BASE_PGSZ. */
+
+	assert(va + sz > va);
+	assert(BASE_PGSZ == _64KB);
+
+	for (v = va; v < va + sz; v += BASE_PGSZ) {
+		hash = mmu_va_to_hash(va);
+		pteg = ((struct pteg *)&htaborg) + hash;
+
+		/* Search for an empty slot. */
+		for (i = 0; i < 8; ++i)
+			if (!bits_get(pteg->pte[i].v[0], HPTE_V))
+				break;
+
+		assert(i < 8);
+		pte = &pteg->pte[i];
+
+		a = b = 0;
+		ava = VA_TO_AVA(v);
+		a |= bits_set(HPTE_AVA, ava);
+		a |= bits_on(HPTE_L);
+		a |= bits_on(HPTE_V);
+
+		b |= bits_set(HPTE_LP, 1);	/* 64KB */
+		b |= bits_on(HPTE_M);
+		if ((rwx & 1) == 0)	/* no execute */
+			b |= bits_on(HPTE_N);
+
+		if ((rwx & 2) == 0) {	/* read only */
+			b |= bits_on(HPTE_PP0);
+			b |= bits_set(HPTE_PP1, 2);
+		}
+
+		/*
+		 * Ignoring the eieio ordering between the two statements,
+		 * and the ptesync after. Fixup when enabling SMP.
+		 */
+		pte->v[1] = b;
+		pte->v[0] = a;
+	}
+
+	/* Order the updates wrt page table search. */
+	ptesync();
+}
+
 void mmu_init(struct as *as)
 {
-	uint64_t v, w, esid, vsid, hash, hi, lo, va, ava;
+	uint64_t v, w, esid, vsid, va;
+	size_t sz;
 	const struct elf64_phdr *ph;
-	struct pteg *pteg;
 	extern char htaborg;
 
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
@@ -83,45 +153,30 @@ void mmu_init(struct as *as)
 	as->slbe.v[1] = w;
 
 
-	/* Fill the PTEs. */
-
 	/*
-	 * Since we fixed HTABSIZE to 0, the hash function contributes the
-	 * minimum 11-bits, and we can ignore the AND-ADD operations.
+	 * Fill the PTEs. There are just two PHDRS entries which need to
+	 * be taken care of - vmm text and vmm data.
 	 */
+	va = KVA_BASE;	/* We keep va = ea */
+	sz = ph[PHDRS_TEXT].memsz;
+	sz = ALIGN_UP(sz, BASE_PGSZ);
+	mmu_init_map(va, sz, 5);	/* r-x */
 
-	/* 0xc000....0000 to 0x0000....0000 mapped as S_RO. */
+	va = ph[PHDRS_RODATA].vaddr;
+	sz = ph[PHDRS_RODATA].memsz;
+	sz = ALIGN_UP(sz, BASE_PGSZ);
+	mmu_init_map(va, sz, 4);	/* r-- */
 
-	va = KVA_BASE;	/* because we keep VSID = ESID. */
-	hi = bits_get(va, HPTE_VA_HI);
-	lo = bits_get(va, HPTE_VA_LO);
-	lo >>= BASE_PGSZ_BITS;
-	hash = hi ^ lo;
-	hash = bits_get(hash, HPTE_HASH);
+	va = ph[PHDRS_DATA].vaddr;
+	sz = ph[PHDRS_DATA].memsz;
+	sz = ALIGN_UP(sz, BASE_PGSZ);
+	mmu_init_map(va, sz, 6);	/* rw- */
 
-	pteg = ((struct pteg *)&htaborg) + hash;
-	v = w = 0;
-	ava = VA_TO_AVA(KVA_BASE);
-	v |= bits_set(HPTE_AVA, ava);
-	v |= bits_on(HPTE_L);
-	v |= bits_on(HPTE_V);
-
-	w |= bits_set(HPTE_LP, 1);
-	w |= bits_on(HPTE_M);
-	w |= bits_on(HPTE_PP0);
-	w |= bits_set(HPTE_PP1, 2);
-
-	pteg->pte[0].v[1] = w;
-	eieio();
-	pteg->pte[0].v[0] = v;
-	ptesync();
-
-	/* Test writing on S_RO address, */
+	/* Run tests to verify that the mmu works as expected. */
 	mfmsr(v);
 	v |= bits_on(MSR_IR);
 	v |= bits_on(MSR_DR);
 	mtmsr(v);
 
-	*(char *)KVA_BASE = 0x10;
 	for (;;);
 }
