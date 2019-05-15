@@ -190,6 +190,5 @@ void mmu_init(struct as *as)
 	v |= bits_on(MSR_DR);
 	mtmsr(v);
 
-	*(char *)KVA_BASE = 34;
 	for (;;);
 }
