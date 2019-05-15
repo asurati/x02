@@ -158,8 +158,12 @@ enum {
 	UNIT_MAX
 };
 
+struct slbe {
+	uint64_t v[2];
+};
+
 struct as {
-	uint64_t slbe[2];
+	struct slbe slbe;
 };
 
 struct pte {
