@@ -21,9 +21,7 @@ void mmu_init(struct as *as)
 	(void)as;
 
 	/* Empty SLB. QEMU slbia doesn't support IH. */
-	isync();
 	slbmte(0,0);
-	isync();
 	slbia(4);
 	isync();
 
