@@ -106,7 +106,7 @@ static uint64_t _copy_payload(const struct elf64_hdr *eh)
 	 * in size.
 	 */
 	sz = eh->phnum * sizeof(*ph);
-	if (sz > 0x100)
+	if ((uintptr_t)PHDRS_BASE + sz > 0x100)
 		return 0;
 
 	p = (const char *)eh;

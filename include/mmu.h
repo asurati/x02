@@ -11,7 +11,10 @@
 
 /* Must match with vmm.ld. */
 #define KVA_BASE			0xc000000000000000ull
-#define PHDRS_BASE			0
+
+/* Keeping PHDRS_BASE 0/NULL causes undefined behaviour wrt memcpy. */
+#define PHDRS_BASE			(void *)8
+
 #define PHDRS_TEXT			1
 #define PHDRS_RODATA			2
 #define PHDRS_DATA			3
