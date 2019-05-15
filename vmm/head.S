@@ -83,7 +83,7 @@ STACK:
 
 .section .bss
 .globl htaborg
-.globl ptaborg
+.globl parttaborg
 
 /*
  * HTABORG must be 2^18-byte aligned. We keep HTABSIZE as 0, forcing the
@@ -96,7 +96,7 @@ htaborg:
 
 /* Partition Table is aligned to its size, with the minimum size being 4KB. */
 .align 12
-ptaborg:
+parttaborg:
 .fill 4096
 
 .align 4
