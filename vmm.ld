@@ -23,7 +23,7 @@ PHDRS
 	 * Keep the size of phdr <= 0x100, since the loader copies
 	 * PHDRS into the first 0x100 bytes of physical space.
 	 */
-	nommu PT_LOAD;
+	nommu PT_LOAD FLAGS(5);
 	text PT_LOAD FLAGS(5);		/* r-x */
 	rodata PT_LOAD FLAGS(4);	/* r-- */
 	data PT_LOAD FLAGS(6);		/* rw- */
@@ -77,8 +77,6 @@ SECTIONS
 
 
 
-
-
 	. = ALIGN(0x10000);
 	.data : AT(ADDR(.data) - KVA_BASE) {
 		*(.data);
@@ -86,6 +84,13 @@ SECTIONS
 
 	.bss : AT(ADDR(.bss) - KVA_BASE) {
 		*(.bss);
+	}
+
+
+
+	. = ALIGN(0x40000);
+	.htab (NOLOAD) : {
+		*(.htab);
 	}
 	_end = .;
 }
