@@ -121,11 +121,8 @@ void *memset(void *dest, int val, size_t sz)
 {
 	char *d = dest;
 
-	while (sz > 0) {
-		*d = val;
-		++d;
-		--sz;
-	}
+	while (sz--)
+		*d++ = val;
 	return dest;
 }
 
@@ -134,11 +131,7 @@ void *memcpy(void *dest, const void *src, size_t sz)
 	char *d = dest;
 	const char *s = src;
 
-	while (sz > 0) {
-		*d = *s;
-		++d;
-		++s;
-		--sz;
-	}
+	while (sz--)
+		*d++ = *s++;
 	return dest;
 }
