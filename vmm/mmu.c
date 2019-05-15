@@ -78,6 +78,10 @@ void mmu_init(struct as *as)
 	w |= bits_set(SLB_IX, 0);
 	slbmte(v, w);
 
+	/* Save the SLB entry which maps the hypervisor. */
+	as->slbe.v[0] = v;
+	as->slbe.v[1] = w;
+
 
 	/* Fill the PTEs. */
 
