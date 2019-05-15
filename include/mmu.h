@@ -12,6 +12,9 @@
 /* Must match with vmm.ld. */
 #define KVA_BASE			0xc000000000000000ull
 #define PHDRS_BASE			0
+#define PHDRS_TEXT			1
+#define PHDRS_RODATA			2
+#define PHDRS_DATA			3
 
 #define EA_TO_RA(v)			((uintptr_t)(v) - KVA_BASE)
 #define VA_TO_AVA(v)			((uintptr_t)(v) >> 23)

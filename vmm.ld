@@ -23,10 +23,10 @@ PHDRS
 	 * Keep the size of phdr <= 0x100, since the loader copies
 	 * PHDRS into the first 0x100 bytes of physical space.
 	 */
-	hdr  PT_LOAD FILEHDR PHDRS FLAGS(0);
 	nommu PT_LOAD;
-	text PT_LOAD;
-	data PT_LOAD;
+	text PT_LOAD FLAGS(5);		/* r-x */
+	rodata PT_LOAD FLAGS(4);	/* r-- */
+	data PT_LOAD FLAGS(6);		/* rw- */
 }
 
 
@@ -55,23 +55,34 @@ SECTIONS
 	.text : AT(ADDR(.text) - KVA_BASE) {
 		*(.text.startup);
 		*(.text);
-		*(.rodata);
-		*(.rodata.*);
 	}
 
+
+
+
 	. = ALIGN(0x10000);
+	.rodata : AT(ADDR(.rodata) - KVA_BASE) {
+		*(.rodata);
+		*(.rodata.*);
+	} :rodata
+
 	.opd : AT(ADDR(.opd) - KVA_BASE) {
 		*(.opd);
-	} :data
+	}
 
 	.got : AT(ADDR(.got) - KVA_BASE) {
 		*(.toc);
 		*(.got);
 	}
 
+
+
+
+
+	. = ALIGN(0x10000);
 	.data : AT(ADDR(.data) - KVA_BASE) {
 		*(.data);
-	}
+	} :data
 
 	.bss : AT(ADDR(.bss) - KVA_BASE) {
 		*(.bss);
