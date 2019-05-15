@@ -36,6 +36,8 @@ PKG = pkg
 SRC += vmm/head.S
 SRC += vmm/excptn.S
 
+SRC += vmm/assert.c
+SRC += vmm/lib.c
 SRC += vmm/main.c
 SRC += vmm/mmu.c
 SRC += vmm/vmm.c

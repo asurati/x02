@@ -5,9 +5,9 @@
 
 #include <cpu.h>
 #include <stdlib.h>
-#include <uart.h>
 
 #include <assert.h>
+
 void assert_fail(const char *msg, const char *file, int line)
 {
 	static char str[5];
