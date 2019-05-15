@@ -38,6 +38,7 @@ SRC += vmm/excptn.S
 
 SRC += vmm/main.c
 SRC += vmm/mmu.c
+SRC += vmm/vmm.c
 
 OBJ = $(addsuffix .o,$(SRC))
 DEP = $(addsuffix .d,$(SRC))
