@@ -51,6 +51,11 @@ void main(uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
 	vmm_part_init();
 	mmu_init(&vmm_as);
 
+	/*
+	 * The below switch to a partition cannot be done as it is;
+	 * vmm must switch itself to real mode and then launch the
+	 * guest.
+	 */
 	v = 0xdeadf00dcafebabc;
 	mtspr(SPR_HSRR0, v);
 	mfmsr(v);
@@ -59,52 +64,7 @@ void main(uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
 	hrfid();
 	for (;;)
 		++x;
-	(void)r3;
-	(void)r4;
-	(void)r5;
-	(void)r6;
 	(void)r7;
 	(void)r8;
 	(void)r9;
 }
-
-#if 0
-#include <stdio.h>
-#include <uart.h>
-#include <mm.h>
-#include <cpu.h>
-#include <elf.h>
-
-static struct as kas;
-void mm_init(int id);
-void euart_init();
-void gic_init(int id);
-void mmu_init(const struct elf64_hdr *eh, struct as *as);
-void mmu_switch(struct tab *pmd);
-void pm_init(const struct elf64_hdr *eh);
-void vm_init(struct as *as);
-
-void setup(int id)
-{
-	const struct elf64_hdr *eh;
-
-	if (id == 0) {
-		eh = (const struct elf64_hdr *)(SOC_RAM_BASE + _2MB);
-		mmu_init(eh, &kas);
-	}
-
-	mmu_switch(kas.pmd);
-
-	if (id == 0) {
-		eh = (const struct elf64_hdr *)(KVA_BASE + _2MB);
-		pm_init(eh);
-		vm_init(&kas);
-		euart_init();
-	}
-	euart_str("asdf\n");
-	gic_init(id);
-	__asm volatile("smc #0xdead");
-	for (;;)
-		wfi();
-}
-#endif
