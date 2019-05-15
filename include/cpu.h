@@ -33,16 +33,13 @@
 
 #define slbia(ih)	__asm volatile("slbia " #ih ::: "memory")
 #define isync()		__asm volatile("isync" ::: "memory")
+#define hwsync()	__asm volatile("hwsync" ::: "memory")
+#define eieio()		__asm volatile("eieio" ::: "memory")
+#define ptesync()	__asm volatile("ptesync" ::: "memory")
 #define slbmte(rs, rb)							\
-	__asm volatile("slbmte	%0, %1" :: "r" (rs), "r" (rb) : "memory")
-
-
-
-#define SPR_HSRR0			314
-#define SPR_HSRR1			315
-#define SPR_PTCR			464
-
-#define hrfid()		__asm volatile("hrfid\n\t" ::: "memory");
+	__asm volatile("isync\n\t"					\
+		       "slbmte	%0, %1\n\t"				\
+		       "isync\n\t" :: "r" (rs), "r" (rb) : "memory")
 
 #define mtspr(spr, v)							\
 	__asm volatile("mtspr	%0, %1" :: "i" (spr), "r" (v) : "memory")
@@ -51,10 +48,5 @@
 	__asm volatile("mfspr	%0, %1" : "=r" (v) : "i" (spr) : "memory")
 
 #define mfmsr(v)	__asm volatile("mfmsr	%0" : "=r" (v) :: "memory")
-
-/* Move paritition items into vmm.h */
-struct hpart_entry {
-	uint64_t v[2];
-};
-
+#define mtmsr(v)	__asm volatile("mtmsr	%0" :: "r" (v) : "memory")
 #endif
