@@ -29,6 +29,7 @@ static uint64_t mmu_va_to_hash(uint64_t va)
 static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 {
 	uint64_t hash, v, a, b, ava, ra;
+	uint8_t lp;
 	struct pteg *pteg;
 	struct pte *pte;
 	extern char htaborg;
@@ -42,6 +43,11 @@ static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 	for (v = va; v < va + sz; v += BASE_PGSZ) {
 		ra = EA_TO_RA(v);
 		ra >>= BASE_PGSZ_BITS;	/* We keep p == b */
+		lp = ra & 0xf;		/* For 64KB p */
+		ra >>= 4;		/* The ARPN. */
+
+		lp <<= 4;
+		lp |= 1;		/* The 8bit LP value. */
 
 		hash = mmu_va_to_hash(va);
 		pteg = ((struct pteg *)&htaborg) + hash;
@@ -61,7 +67,7 @@ static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 		a |= bits_on(HPTE_V);
 
 		b |= bits_set(HPTE_ARPN, ra);
-		b |= bits_set(HPTE_LP, 1);	/* 64KB */
+		b |= bits_set(HPTE_LP, lp);
 		b |= bits_on(HPTE_M);
 		if ((rwx & 1) == 0)	/* no execute */
 			b |= bits_on(HPTE_N);
@@ -89,8 +95,6 @@ void mmu_init(struct as *as)
 	size_t sz;
 	const struct elf64_phdr *ph;
 	extern char htaborg, _end;
-
-	ph = (const struct elf64_phdr *)PHDRS_BASE;
 
 	/* Empty SLB. QEMU slbia doesn't support IH. */
 	slbmte(0,0);
@@ -157,17 +161,16 @@ void mmu_init(struct as *as)
 	/* Initialize the page table. */
 	va = (uintptr_t)&htaborg;
 	sz = (uintptr_t)&_end - va;
-	memset((void *)va, 0, sz);	/* htab isn't in .bss */
+	memset(&htaborg, 0, sz);	/* htab isn't in .bss */
 
 	/*
 	 * Fill the PTEs. There are just two PHDRS entries which need to
 	 * be taken care of - vmm text and vmm data.
 	 */
-	va = ph[PHDRS_TEXT].vaddr;	/* We keep va = ea */
+	ph = (const struct elf64_phdr *)PHDRS_BASE;
+	va = ph[PHDRS_TEXT].paddr;
 	sz = ph[PHDRS_TEXT].memsz;
-	va += sz;
-	sz = va - KVA_BASE;
-	sz = ALIGN_UP(sz, BASE_PGSZ);
+	sz = ALIGN_UP(va + sz, BASE_PGSZ);
 	mmu_init_map(KVA_BASE, sz, 5);	/* r-x */
 
 	va = ph[PHDRS_RODATA].vaddr;
@@ -184,11 +187,8 @@ void mmu_init(struct as *as)
 	sz = (uintptr_t)&_end - va;
 	mmu_init_map(va, sz, 6);	/* rw- */
 
-	/* Run tests to verify that the mmu works as expected. */
 	mfmsr(v);
 	v |= bits_on(MSR_IR);
 	v |= bits_on(MSR_DR);
 	mtmsr(v);
-
-	for (;;);
 }
