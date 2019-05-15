@@ -10,9 +10,11 @@
 
 void assert_fail(const char *msg, const char *file, int line)
 {
+	/*
 	static char str[5];
 
 	itoa(line, str, 16);
+	*/
 	for (;;)
 		;
 	(void)msg;
