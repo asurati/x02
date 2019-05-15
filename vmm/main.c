@@ -6,6 +6,7 @@
 #include <bits.h>
 #include <cpu.h>
 #include <mmu.h>
+#include <vmm.h>
 
 #define EPAPR_MAGIC			0x65504150
 
@@ -47,6 +48,7 @@ void main(uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
 	if ((v & i) != j)
 		return;
 
+	vmm_part_init();
 	mmu_init(&vmm_as);
 
 	v = 0xdeadf00dcafebabc;
