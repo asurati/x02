@@ -50,13 +50,13 @@ struct elf64_shdr {
 };
 
 
-#define EI_CLASS						4
-#define ELFCLASS64						2
+#define EI_CLASS		4
+#define ELFCLASS64		2
 
-#define EI_DATA							5
-#define ELFDATA2MSB						2
+#define EI_DATA			5
+#define ELFDATA2MSB		2
 
-#define ET_EXEC							2
+#define ET_EXEC			2
 
-#define EM_PPC64						21
+#define EM_PPC64		21
 #endif
