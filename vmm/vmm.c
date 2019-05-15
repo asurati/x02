@@ -34,9 +34,9 @@ void vmm_part_init()
 	pe->v[0]  = v;
 	pe->v[1]  = 0;
 
-	/* Turn on AIL. */
 	mfspr(v, SPR_LPCR);
-	v |= bits_on(LPCR_AIL);
+	v |= bits_on(LPCR_AIL);	/* Enable AIL. */
+	v |= bits_on(LPCR_TC);	/* Disable 2ndary page table search. */
 
 	hwsync();	/* Let the updates propagate. */
 

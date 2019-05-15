@@ -10,6 +10,8 @@
 
 #define LPCR_AIL_L			39
 #define LPCR_AIL_R			40
+#define LPCR_TC_L			54
+#define LPCR_TC_R			54
 
 #define SPR_HSRR0			314
 #define SPR_HSRR1			315
