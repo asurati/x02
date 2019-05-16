@@ -12,7 +12,7 @@ QFLAGS = -m 1g -serial mon:stdio -nographic -nodefaults
 
 QFLAGS += -d int,guest_errors,unimp,mmu
 QFLAGS += -M powernv -bios skiboot.lid
-QFLAGS += -cpu power9 -smp cores=4
+QFLAGS += -cpu power9 -smp cores=1
 
 CFLAGS += -D__QEMU__
 
