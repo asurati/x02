@@ -163,10 +163,7 @@ void mmu_init(struct as *as)
 	sz = (uintptr_t)&_end - va;
 	memset(&htaborg, 0, sz);	/* htab isn't in .bss */
 
-	/*
-	 * Fill the PTEs. There are just two PHDRS entries which need to
-	 * be taken care of - vmm text and vmm data.
-	 */
+	/* Map PTEs for the vmm binary. */
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
 	va = ph[PHDRS_TEXT].paddr;
 	sz = ph[PHDRS_TEXT].memsz;
