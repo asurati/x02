@@ -26,9 +26,9 @@ static uint64_t mmu_va_to_hash(uint64_t va)
 	return hash;
 }
 
-static void mmu_init_map(uint64_t va, size_t sz, int rwx)
+static void mmu_init_map(uint64_t va, uint64_t ra, size_t sz, int rwx)
 {
-	uint64_t hash, v, a, b, ava, ra;
+	uint64_t hash, v, a, b, ava, r;
 	uint8_t lp;
 	struct pteg *pteg;
 	struct pte *pte;
@@ -40,11 +40,10 @@ static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 	assert(va + sz > va);
 	assert(BASE_PGSZ == _64KB);
 
-	for (v = va; v < va + sz; v += BASE_PGSZ) {
-		ra = EA_TO_RA(v);
-		ra >>= BASE_PGSZ_BITS;	/* We keep p == b */
-		lp = ra & 0xf;		/* For 64KB p */
-		ra >>= 4;		/* The ARPN. */
+	for (v = va, r = ra; v < va + sz; v += BASE_PGSZ, r += BASE_PGSZ) {
+		r >>= BASE_PGSZ_BITS;	/* We keep p == b */
+		lp = r & 0xf;		/* For 64KB p */
+		r >>= 4;		/* The ARPN. */
 
 		lp <<= 4;
 		lp |= 1;		/* The 8bit LP value. */
@@ -66,7 +65,7 @@ static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 		a |= bits_on(HPTE_L);
 		a |= bits_on(HPTE_V);
 
-		b |= bits_set(HPTE_ARPN, ra);
+		b |= bits_set(HPTE_ARPN, r);
 		b |= bits_set(HPTE_LP, lp);
 		b |= bits_on(HPTE_M);
 		if ((rwx & 1) == 0)	/* no execute */
@@ -91,7 +90,8 @@ static void mmu_init_map(uint64_t va, size_t sz, int rwx)
 
 void mmu_init(struct as *as)
 {
-	uint64_t v, w, esid, vsid, va;
+	int i;
+	uint64_t v, w, esid, vsid, va, ra;
 	size_t sz;
 	const struct elf64_phdr *ph;
 	extern char htaborg, _end;
@@ -158,31 +158,25 @@ void mmu_init(struct as *as)
 	as->slbe.v[0] = v;
 	as->slbe.v[1] = w;
 
-	/* Initialize the page table. */
+	/* Zero the page table. */
 	va = (uintptr_t)&htaborg;
 	sz = (uintptr_t)&_end - va;
 	memset(&htaborg, 0, sz);	/* htab isn't in .bss */
 
-	/* Map PTEs for the vmm binary. */
+	/* Map segments of the vmm binary. */
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
-	va = ph[PHDRS_TEXT].paddr;
-	sz = ph[PHDRS_TEXT].memsz;
-	sz = ALIGN_UP(va + sz, BASE_PGSZ);
-	mmu_init_map(KVA_BASE, sz, 5);	/* r-x */
+	for (i = 0; i < PHDRS_NUM; ++i) {
+		va = ph[i].vaddr;	/* va = ea */
+		ra = ph[i].paddr;
+		sz = ALIGN_UP(ph[i].memsz, BASE_PGSZ);
+		mmu_init_map(va, ra, sz, ph[i].flags);
+	}
 
-	va = ph[PHDRS_RODATA].vaddr;
-	sz = ph[PHDRS_RODATA].memsz;
-	sz = ALIGN_UP(sz, BASE_PGSZ);
-	mmu_init_map(va, sz, 4);	/* r-- */
-
-	va = ph[PHDRS_DATA].vaddr;
-	sz = ph[PHDRS_DATA].memsz;
-	sz = ALIGN_UP(sz, BASE_PGSZ);
-	mmu_init_map(va, sz, 6);	/* rw- */
-
+	/* Page table is not in a loadable segment; process it separately. */
 	va = (uintptr_t)&htaborg;
+	ra = EA_TO_RA(va);
 	sz = (uintptr_t)&_end - va;
-	mmu_init_map(va, sz, 6);	/* rw- */
+	mmu_init_map(va, ra, sz, 6);	/* rw- */
 
 	mfmsr(v);
 	v |= bits_on(MSR_IR);
