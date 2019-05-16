@@ -31,8 +31,8 @@ excp_nommu 0x980, hdec
 excp_nommu 0xa00, dpd
 excp_nommu 0xc00, sc
 excp_nommu 0xd00, trace
-excp_nommu 0xe00, hdstor
-excp_nommu 0xe20, histor
+excp_nommu 0xe00, hdstr
+excp_nommu 0xe20, histr
 excp_nommu 0xe40, hemul
 excp_nommu 0xe60, hmntn
 excp_nommu 0xe80, dhd
@@ -57,8 +57,8 @@ excp_mmu 0x980, hdec
 excp_mmu 0xa00, dpd
 excp_mmu 0xc00, sc
 excp_mmu 0xd00, trace
-excp_mmu 0xe00, hdstor
-excp_mmu 0xe20, histor
+excp_mmu 0xe00, hdstr
+excp_mmu 0xe20, histr
 excp_mmu 0xe40, hemul
 excp_mmu 0xe60, hmntn
 excp_mmu 0xe80, dhd
