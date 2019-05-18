@@ -47,6 +47,7 @@ SECTIONS
 	. = ALIGN(0x4000);
 	.text : AT(ADDR(.text) - KVA_BASE) {
 		*(.excp.mmu);	/* Must be first. */
+		. = ALIGN(0x1000);
 		*(.text.startup);
 		*(.text);
 	}
