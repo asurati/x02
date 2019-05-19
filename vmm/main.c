@@ -15,7 +15,7 @@ volatile int x = 0xdeadf00d;
 void main(uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
 	  uint64_t r8, uint64_t r9)
 {
-	uint64_t v, i, j;
+	uint64_t v, i, j, w;
 
 	/* booting-without-of.txt in Linux kernel doc. */
 	/* See also ePAPR v1.1, and skiboot's start_kernel source. */
@@ -56,11 +56,23 @@ void main(uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7,
 	 * vmm must switch itself to real mode and then launch the
 	 * guest.
 	 */
+	mfmsr(v);
+	w = v;
+	v &= bits_off(MSR_IR);
+	v &= bits_off(MSR_DR);	/* To set lpidr */
+	mtmsr(v);
+	isync();
+
+	mtspr(SPR_LPIDR, 1);
 	v = 0xdeadf00dcafebabc;
+	v = 0xc000000000000100;
+	v = 0x8ee8;
 	mtspr(SPR_HSRR0, v);
 	mfmsr(v);
-	v &= bits_off(MSR_HV);
-	mtspr(SPR_HSRR1, v);
+	w &= bits_off(MSR_HV);
+	w &= bits_off(MSR_IR);
+	w &= bits_off(MSR_DR);
+	mtspr(SPR_HSRR1, w);	/* Attempt to run inside VRMA. */
 	hrfid();
 	for (;;)
 		++x;
