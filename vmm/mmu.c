@@ -125,13 +125,6 @@ void mmu_init(struct as *as)
 	 * ptesync
 	 */
 
-	v = 3 << (63 - 53);	/* IS=3 */
-	__asm volatile("tlbie	%0, %1, 2, 0, 0\n\t"
-		       "tlbie	%0, %1, 2, 1, 0\n\t"
-		       "eieio\n\t"
-		       "tlbsync\n\t"
-		       "ptesync\n\t" :: "r" (v), "r" (0) : "memory");
-
 	/*
 	 * Setup an SLBE to map a 256MB segment from EA 0xc000.... to 
 	 * RA 0x0000.... for the vmm.
@@ -181,5 +174,14 @@ void mmu_init(struct as *as)
 	mfmsr(v);
 	v |= bits_on(MSR_IR);
 	v |= bits_on(MSR_DR);
+
+	w = 3 << (63 - 53);
+	__asm volatile("tlbie	%0, %1, 2, 0, 0\n\t"
+		       "tlbie	%0, %1, 2, 1, 0\n\t"
+		       :: "r" (w), "r" (0) : "memory");
+	eieio();
+	tlbsync();
+	ptesync();
+
 	mtmsr(v);
 }
