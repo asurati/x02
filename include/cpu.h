@@ -36,6 +36,7 @@
 #define hwsync()	__asm volatile("hwsync" ::: "memory")
 #define eieio()		__asm volatile("eieio" ::: "memory")
 #define ptesync()	__asm volatile("ptesync" ::: "memory")
+#define tlbsync()	__asm volatile("tlbsync" ::: "memory")
 #define slbmte(rs, rb)							\
 	__asm volatile("isync\n\t"					\
 		       "slbmte	%0, %1\n\t"				\
