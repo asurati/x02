@@ -11,7 +11,7 @@
 
 void vmm_part_init()
 {
-	extern char parttaborg;
+	extern char parttaborg[];
 	extern char htaborg;
 	struct part_entry *pe;
 	uint64_t v, w, ptab;
@@ -23,7 +23,7 @@ void vmm_part_init()
 	 * Fill the first entry in the partition table,
 	 * for LPID = 0 = hypervisor.
 	 */
-	pe = (struct part_entry *)(&parttaborg);
+	pe = (struct part_entry *)parttaborg;
 
 	w = EA_TO_RA(&htaborg);/* TODO check alignment */
 	w >>= 18;	/* htaborg is high order 42 bits. */
