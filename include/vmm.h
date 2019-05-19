@@ -8,6 +8,8 @@
 
 #include <cpu.h>
 
+#define LPCR_VPM0_L			0
+#define LPCR_VPM0_R			0
 #define LPCR_AIL_L			39
 #define LPCR_AIL_R			40
 #define LPCR_TC_L			54
