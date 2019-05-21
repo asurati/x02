@@ -80,30 +80,7 @@ STACK:
 .previous
 */
 
-.section .htab, "aw", @nobits
-.globl htaborg
-
-/*
- * HTABORG must be 2^18-byte aligned. We keep HTABSIZE as 0, forcing the
- * page table to contain the minimum required 2^11 128-byte PTEGs.
- * Thus, the table is 2^(11 + 7) = 2^18 bytes in size.
- */
-.align 18
-htaborg:
-.fill 32768, 8
-
-
-
-
 .section .bss
-.globl parttaborg
-
-/* Partition Table is aligned to its size, with the minimum size being 4KB. */
-.align 12
-parttaborg:
-.fill 4096
-
 .align 4
 .fill 4096
 stack:
-

@@ -76,9 +76,29 @@ SECTIONS
 		*(.bss);
 	}
 
+	/* NOLOAD sections follow for large allocations. */
+
+	/*
+	 * Partition table is naturally aligned. P9's partition table size
+	 * is fixed at 64KB.
+	 */
+	. = ALIGN(0x10000);
+	.parttab (NOLOAD) : {
+		_parttab_org = .;
+		. += 0x10000;
+		_parttab_end = .;
+	}
+
+	/*
+	 * HTABORG must be 2^18-byte aligned. We keep HTABSIZE as 0, forcing the
+	 * page table to contain the minimum required 2^11 128-byte PTEGs.
+	 * Thus, the table is 2^(11 + 7) = 2^18 bytes in size.
+	 */
 	. = ALIGN(0x40000);
 	.htab (NOLOAD) : {
-		*(.htab);
+		_htab_org = .;
+		. += 0x40000;
+		_htab_end = .;
 	}
 	_end = .;
 }
