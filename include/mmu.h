@@ -19,48 +19,41 @@
 #define EA_TO_RA(v)			((uintptr_t)(v) - KVA_BASE)
 #define VA_TO_AVA(v)			((uintptr_t)(v) >> 23)
 
-#define _1KB_BITS			10
-#define _1KB				(1ull << _1KB_BITS)
-#define _1KB_MASK			(_1KB - 1)
-
-#define PAGE_SIZE_BITS			12
-#define PAGE_SIZE			(1ull << PAGE_SIZE_BITS)
-#define PAGE_SIZE_MASK			(PAGE_SIZE - 1)
-
 #define _64KB_BITS			16
 #define _64KB				(1ull << _64KB_BITS)
 #define _64KB_MASK			(_64KB - 1)
-
-#define _1MB_BITS			20
-#define _1MB				(1ull << _1MB_BITS)
-#define _1MB_MASK			(_1MB - 1)
-
-#define _2MB_BITS			21
-#define _2MB				(1ull << _2MB_BITS)
-#define _2MB_MASK			(_2MB - 1)
 
 #define _256MB_BITS			28
 #define _256MB				(1ull << _256MB_BITS)
 #define _256MB_MASK			(_256MB - 1)
 
-#define _1GB_BITS			30
-#define _1GB				(1ull << _1GB_BITS)
-#define _1GB_MASK			(_1GB - 1)
-
+/*
+ * Fix base page size == actual page size == 64KB. This fixes the L||LP fields
+ * in SLBE and PTE.
+ */
 #define BASE_PGSZ			_64KB
 #define BASE_PGSZ_BITS			_64KB_BITS
 #define BASE_PGSZ_MASK			_64KB_MASK
 
+#define ACT_PGSZ			BASE_PGSZ
+#define ACT_PGSZ_BITS			BASE_PGSZ_BITS
+#define ACT_PGSZ_MASK			BASE_PGSZ_MASK
+
+#define SEG_SZ				_256MB
+#define SEG_SZ_BITS			_256MB_BITS
+#define SEG_SZ_MASK			_256MB_MASK
+
 #define HASH_PRIMARY			0
 #define HASH_SECONDARY			1
 
+/*
+ * These values are for 256MB segment translations. Also assumed is the fact
+ * that we keep the virtual address size as 64bits.
+ */
 #define HPTE_VA_HI_L			0
 #define HPTE_VA_HI_R			35
 #define HPTE_VA_LO_L			36
-#define HPTE_VA_LO_R			63
-
-#define HPTE_HASH_L			53
-#define HPTE_HASH_R			63
+#define HPTE_VA_LO_R			(63 - BASE_PGSZ_BITS)
 
 #define PTCR_PATB_L			4
 #define PTCR_PATB_R			51
@@ -170,6 +163,9 @@ struct slbe {
 
 struct as {
 	struct slbe slbe;
+	struct pteg *htab;
+	uint64_t hash_mask;
+	int htabsz;
 };
 
 struct pte {

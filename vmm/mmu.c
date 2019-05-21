@@ -10,83 +10,99 @@
 #include <vmm.h>
 
 /*
- * Since we fixed HTABSIZE to 0, the hash function contributes the
- * minimum 11-bits, and we can ignore the AND-ADD operations.
- */
-
-static uint64_t mmu_va_to_hash(uint64_t va, int type)
+static uint64_t mmu_hash_mask(const struct as *as)
 {
-	uint64_t hi, lo, hash;
+	assert(as->htabsz >= 0 && as->htabsz <= 28);
+	return (1ull << (as->htabsz + 11) - 1);
+}
+*/
+
+static uint64_t mmu_va_hash(const struct as *as, uint64_t va)
+{
+	uint64_t hi, lo;
+
+	(void)as;
 
 	hi = bits_get(va, HPTE_VA_HI);
 	lo = bits_get(va, HPTE_VA_LO);
-	lo >>= BASE_PGSZ_BITS;
-	hash = hi ^ lo;
-	if (type == HASH_SECONDARY)
-		hash = ~hash;
-	return bits_get(hash, HPTE_HASH);
+	return hi ^ lo;
 }
 
-static void mmu_init_map(uint64_t va, uint64_t ra, size_t sz, int rwx)
+static int mmu_map_base_page(struct as *as, uint64_t va, uint64_t ra,
+				      int rwx)
 {
-	uint64_t hash, v, a, b, ava, r;
-	uint8_t lp;
+	int i, j;
+	uint64_t hash[2], a, b, r, lp, ava;
 	struct pteg *pteg;
 	struct pte *pte;
-	extern char _htab_org;
-	int i;
 
-	/* We attempt to create one PTE for each block of size BASE_PGSZ. */
+	hash[HASH_PRIMARY] = hash[HASH_SECONDARY] = mmu_va_hash(as, va);
 
-	assert(va + sz > va);
-	assert(BASE_PGSZ == _64KB);
+	hash[HASH_PRIMARY] &= as->hash_mask;
+	hash[HASH_SECONDARY] = ~hash[HASH_SECONDARY];
+	hash[HASH_SECONDARY] &= as->hash_mask;
 
-	for (v = va, r = ra; v < va + sz; v += BASE_PGSZ, r += BASE_PGSZ) {
-		r >>= BASE_PGSZ_BITS;	/* We keep p == b */
-		lp = r & 0xf;		/* For 64KB p */
-		r >>= 4;		/* The ARPN. */
-
-		lp <<= 4;
-		lp |= 1;		/* The 8bit LP value. */
-
-		hash = mmu_va_to_hash(va);
-		pteg = ((struct pteg *)&_htab_org) + hash;
-
-		/* Search for an empty slot. */
-		for (i = 0; i < 8; ++i)
-			if (!bits_get(pteg->pte[i].v[0], HPTE_V))
+	/* Search for a primary slot. */
+	for (i = HASH_PRIMARY; i <= HASH_SECONDARY; ++i) {
+		pteg = &as->htab[hash[i]];
+		for (j = 0; j < 8; ++j)
+			if (!bits_get(pteg->pte[j].v[0], HPTE_V))
 				break;
-
-		assert(i < 8);
-		pte = &pteg->pte[i];
-
-		a = b = 0;
-		ava = VA_TO_AVA(v);
-		a |= bits_set(HPTE_AVA, ava);
-		a |= bits_on(HPTE_L);
-		a |= bits_on(HPTE_V);
-
-		b |= bits_set(HPTE_ARPN, r);
-		b |= bits_set(HPTE_LP, lp);
-		b |= bits_on(HPTE_M);
-		if ((rwx & 1) == 0)	/* no execute */
-			b |= bits_on(HPTE_N);
-
-		if ((rwx & 2) == 0) {	/* read only */
-			b |= bits_on(HPTE_PP0);
-			b |= bits_set(HPTE_PP1, 2);
-		}
-
-		/*
-		 * Ignoring the eieio ordering between the two statements,
-		 * and the ptesync after. Fixup when enabling SMP.
-		 */
-		pte->v[1] = b;
-		pte->v[0] = a;
+		if (j < 8)
+			break;
 	}
+
+	assert(i <= HASH_SECONDARY && j < 8);
+	pte = &pteg->pte[j];
+
+	r = ra >> BASE_PGSZ_BITS;	/* Convert to page num. */
+
+	/*
+	 * The LP field inside PTE for 64KB base and 64KB actual page sizes is
+	 * rrrr 0001, where rrrr are the least significant bits of the ARPN.
+	 */
+
+	lp = ((r & 0xf) << 4) | 1ull;
+	r >>= 4;	/* ARPN. */
+
+	a = b = 0;
+	ava = VA_TO_AVA(va);
+	a |= bits_set(HPTE_AVA, ava);
+	a |= bits_on(HPTE_L);	/* For 64KB:64KB */
+	a |= bits_on(HPTE_V);
+
+	b |= bits_set(HPTE_ARPN, r);
+	b |= bits_set(HPTE_LP, lp);
+	b |= bits_on(HPTE_M);
+	if ((rwx & 1) == 0)	/* no execute */
+		b |= bits_on(HPTE_N);
+
+	if ((rwx & 2) == 0) {	/* read only */
+		b |= bits_on(HPTE_PP0);
+		b |= bits_set(HPTE_PP1, 2);
+	}
+
+	/*
+	 * Ignoring the eieio ordering between the two statements,
+	 * and the ptesync after. Fixup when enabling SMP.
+	 */
+	pte->v[1] = b;
+	pte->v[0] = a;
+	return 0;
+}
+
+static int mmu_map(struct as *as, uint64_t va, uint64_t ra,
+			    size_t sz, int rwx)
+{
+	uint64_t v, r;
+
+	sz = ALIGN_UP(sz, BASE_PGSZ);
+	for (v = va, r = ra; v < va + sz; v += BASE_PGSZ, r += BASE_PGSZ)
+		mmu_map_base_page(as, v, r, rwx);
 
 	/* Order the updates wrt page table search. */
 	ptesync();
+	return 0;
 }
 
 void mmu_init(struct as *as)
@@ -95,7 +111,7 @@ void mmu_init(struct as *as)
 	uint64_t v, w, esid, vsid, va, ra;
 	size_t sz;
 	const struct elf64_phdr *ph;
-	extern char _htab_org, _htab_end;
+	extern char _htab_org, _htab_end, _parttab_org, _parttab_end;
 
 	/* Empty SLB. QEMU slbia doesn't support IH. */
 	slbmte(0,0);
@@ -135,13 +151,16 @@ void mmu_init(struct as *as)
 	/* Fill the SLB entry. */
 	v = w = 0;
 
-	esid = KVA_BASE >> _256MB_BITS;	/* Keep segsize set to 256MB. */
+	/* Keep segsize set to 256MB. */
+	assert(SEG_SZ_BITS == _256MB_BITS);
+
+	esid = KVA_BASE >> SEG_SZ_BITS;
 	vsid = esid;	/* Keep it simple for the moment. */
 
 	v |= bits_set(SLB_B, SLB_B_256MB);
 	v |= bits_set(SLB_VSID, vsid);
 	v |= bits_on(SLB_L) | bits_set(SLB_LP, SLB_LP_64KB);
-	v |= bits_on(SLB_KP);
+	v |= bits_on(SLB_KP);	/* Key == true. */
 
 	w |= bits_set(SLB_ESID, esid);
 	w |= bits_on(SLB_V);
@@ -155,21 +174,32 @@ void mmu_init(struct as *as)
 	/* Zero the page table. */
 	sz = &_htab_end - &_htab_org;
 	memset(&_htab_org, 0, sz);	/* htab isn't in .bss */
+	assert(sz == 256 * 1024ull);	/* Minimum required for now. */
+
+	as->htab = (struct pteg *)&_htab_org;
+	as->hash_mask = 0x7ff;
+	as->htabsz = 0;
 
 	/* Map segments of the vmm binary. */
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
 	for (i = 0; i < PHDRS_NUM; ++i) {
 		va = ph[i].vaddr;	/* va = ea */
 		ra = ph[i].paddr;
-		sz = ALIGN_UP(ph[i].memsz, BASE_PGSZ);
-		mmu_init_map(va, ra, sz, ph[i].flags);
+		sz = ph[i].memsz;
+		mmu_map(as, va, ra, sz, ph[i].flags);
 	}
 
-	/* Page table is not in a loadable segment; process it separately. */
+	/* Partition table is not in a loadable segment; map it separately. */
+	va = (uintptr_t)&_parttab_org;
+	sz = (uintptr_t)&_parttab_end - va;
+	ra = EA_TO_RA(va);
+	mmu_map(as, va, ra, sz, 6);	/* rw- */
+
+	/* Page table is not in a loadable segment; map it separately. */
 	va = (uintptr_t)&_htab_org;
 	sz = (uintptr_t)&_htab_end - va;
 	ra = EA_TO_RA(va);
-	mmu_init_map(va, ra, sz, 6);	/* rw- */
+	mmu_map(as, va, ra, sz, 6);	/* rw- */
 
 	mfmsr(v);
 	v |= bits_on(MSR_IR);
@@ -185,5 +215,5 @@ void mmu_init(struct as *as)
 
 	/* Linux kernel fills in srr0/1 and then executes rfid. */
 	mtmsr(v);
-	for (;;);
+	return;
 }
