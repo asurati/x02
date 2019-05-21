@@ -14,7 +14,7 @@
  * minimum 11-bits, and we can ignore the AND-ADD operations.
  */
 
-static uint64_t mmu_va_to_hash(uint64_t va)
+static uint64_t mmu_va_to_hash(uint64_t va, int type)
 {
 	uint64_t hi, lo, hash;
 
@@ -22,8 +22,9 @@ static uint64_t mmu_va_to_hash(uint64_t va)
 	lo = bits_get(va, HPTE_VA_LO);
 	lo >>= BASE_PGSZ_BITS;
 	hash = hi ^ lo;
-	hash = bits_get(hash, HPTE_HASH);
-	return hash;
+	if (type == HASH_SECONDARY)
+		hash = ~hash;
+	return bits_get(hash, HPTE_HASH);
 }
 
 static void mmu_init_map(uint64_t va, uint64_t ra, size_t sz, int rwx)

@@ -51,6 +51,9 @@
 #define BASE_PGSZ_BITS			_64KB_BITS
 #define BASE_PGSZ_MASK			_64KB_MASK
 
+#define HASH_PRIMARY			0
+#define HASH_SECONDARY			1
+
 #define HPTE_VA_HI_L			0
 #define HPTE_VA_HI_R			35
 #define HPTE_VA_LO_L			36
