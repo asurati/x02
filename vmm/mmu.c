@@ -59,7 +59,7 @@ static int mmu_map_base_page(struct as *as, uint64_t va, uint64_t ra,
 
 	/*
 	 * The LP field inside PTE for 64KB base and 64KB actual page sizes is
-	 * rrrr 0001, where rrrr are the least significant bits of the ARPN.
+	 * rrrr 0001, where rrrr are the least significant bits of the RPN.
 	 */
 
 	lp = ((r & 0xf) << 4) | 1ull;
