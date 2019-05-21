@@ -11,32 +11,34 @@
 
 void vmm_part_init()
 {
-	extern char parttaborg[];
-	extern char htaborg;
+	extern char _parttab_org;
+	extern char _parttab_end;
+	extern char _htab_org;
 	struct part_entry *pe;
 	uint64_t v, w, ptab;
+	size_t sz;
 
-	/* Fill PTCR with the partition table address. */
-	ptab = EA_TO_RA(&parttaborg);
+	/* Zero the partition table. */
+	sz = &_parttab_end - &_parttab_org;
+	memset(&_parttab_org, 0, sz);
 
 	/*
 	 * Fill the first entry in the partition table,
 	 * for LPID = 0 = hypervisor.
 	 */
-	pe = (struct part_entry *)parttaborg;
+	pe = (struct part_entry *)&_parttab_org;
 
-	w = EA_TO_RA(&htaborg);/* TODO check alignment */
+	w = EA_TO_RA(&_htab_org);
 	w >>= 18;	/* htaborg is high order 42 bits. */
 
-	v  = 0;
-	v |= bits_set(HPARTE_HTABORG, w);
-	v |= bits_set(HPARTE_VRMA_PS, 5);	/* b=64KB for VRMA SLB. */
+	v = bits_set(HPARTE_HTABORG, w);
+	/* VRMA_PS for LPID=0 is not used. */
 
 	/* The rest of the fields are kept 0. */
 	pe->v[0]  = v;
 	pe->v[1]  = 0;
 
-	/* Dummy, possibly invalid values. */
+	/* Dummy, possibly invalid values for LPID == 1. */
 	pe[1].v[0] = -1;
 	pe[1].v[1] = 0;
 
@@ -44,18 +46,13 @@ void vmm_part_init()
 	v |= bits_on(LPCR_AIL);	/* Enable AIL. */
 	v |= bits_on(LPCR_TC);	/* Disable 2ndary page table search. */
 
-	/*
-	 * For p9 cpu, VPM0 bit is considered by ISA to be always 1.
-	 * QEMU keeps VPM0 as 0; it also does not support writing on it.
-	 * The below statement is effective only because a modified
-	 * qemu-system-ppc64 binary is being run.
-	 */
-	v |= bits_on(LPCR_VPM0);
-
 	hwsync();	/* Order the updates. */
 
+	/* Fill PTCR with the partition table address. */
+	ptab = EA_TO_RA(&_parttab_org);
+
 	ptesync();
-	mtspr(SPR_PTCR, ptab);
+	mtspr(SPR_PTCR, ptab);	/* PATS field is ignored by P9. */
 	isync();
 	mtspr(SPR_LPCR, v);
 	isync();
