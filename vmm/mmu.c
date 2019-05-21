@@ -32,7 +32,7 @@ static void mmu_init_map(uint64_t va, uint64_t ra, size_t sz, int rwx)
 	uint8_t lp;
 	struct pteg *pteg;
 	struct pte *pte;
-	extern char htaborg;
+	extern char _htab_org;
 	int i;
 
 	/* We attempt to create one PTE for each block of size BASE_PGSZ. */
@@ -49,7 +49,7 @@ static void mmu_init_map(uint64_t va, uint64_t ra, size_t sz, int rwx)
 		lp |= 1;		/* The 8bit LP value. */
 
 		hash = mmu_va_to_hash(va);
-		pteg = ((struct pteg *)&htaborg) + hash;
+		pteg = ((struct pteg *)&_htab_org) + hash;
 
 		/* Search for an empty slot. */
 		for (i = 0; i < 8; ++i)
@@ -94,7 +94,7 @@ void mmu_init(struct as *as)
 	uint64_t v, w, esid, vsid, va, ra;
 	size_t sz;
 	const struct elf64_phdr *ph;
-	extern char htaborg, _end;
+	extern char _htab_org, _htab_end;
 
 	/* Empty SLB. QEMU slbia doesn't support IH. */
 	slbmte(0,0);
@@ -152,9 +152,8 @@ void mmu_init(struct as *as)
 	as->slbe.v[1] = w;
 
 	/* Zero the page table. */
-	va = (uintptr_t)&htaborg;
-	sz = (uintptr_t)&_end - va;
-	memset(&htaborg, 0, sz);	/* htab isn't in .bss */
+	sz = &_htab_end - &_htab_org;
+	memset(&_htab_org, 0, sz);	/* htab isn't in .bss */
 
 	/* Map segments of the vmm binary. */
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
@@ -166,9 +165,9 @@ void mmu_init(struct as *as)
 	}
 
 	/* Page table is not in a loadable segment; process it separately. */
-	va = (uintptr_t)&htaborg;
+	va = (uintptr_t)&_htab_org;
+	sz = (uintptr_t)&_htab_end - va;
 	ra = EA_TO_RA(va);
-	sz = (uintptr_t)&_end - va;
 	mmu_init_map(va, ra, sz, 6);	/* rw- */
 
 	mfmsr(v);
@@ -183,5 +182,7 @@ void mmu_init(struct as *as)
 	tlbsync();
 	ptesync();
 
+	/* Linux kernel fills in srr0/1 and then executes rfid. */
 	mtmsr(v);
+	for (;;);
 }
