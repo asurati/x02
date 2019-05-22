@@ -8,15 +8,6 @@
 
 #include <types.h>
 
-/*
- * HPTMode implementation constants for power9.
- * Note that power9 implements 68 bits of VA space. Here, we limit it to
- * to 64 bits, for the convenience of using a single uint64_t.
- */
-#define EA_BITS				64
-#define VA_BITS				64
-#define RA_BITS				51
-
 /* MSR bits. */
 #define MSR_SF_L			0
 #define MSR_SF_R			0
