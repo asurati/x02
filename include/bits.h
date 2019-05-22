@@ -11,8 +11,9 @@
 #define ALIGN_UP(v, a)		(((v) + (a) - 1) & ~((a) - 1))
 #define ALIGNED(v, a)		(((v) & ((a) - 1)) == 0)
 
+#define bits_width(f)		(f##_R - f##_L + 1)
 #define bits_shift(f)		(63 - f##_R)
-#define bits_mask(f)		((1ull << (f##_R - f##_L + 1)) - 1)
+#define bits_mask(f)		((1ull << bits_width(f)) - 1)
 
 /* get/set: shifts are applied to the value. */
 #define bits_set(f, v)		(((v) & bits_mask(f)) << bits_shift(f))
