@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 typedef uint32_t atomic_t;
+typedef int64_t off_t;
 
 #define ARRAY_SIZE(x)				(sizeof(x)/sizeof(x[0]))
 #define STRINGIFY(x)				#x
