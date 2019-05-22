@@ -12,12 +12,28 @@
 /* Must match with vmm.ld. */
 #define KVA_BASE			0xc000000000000000ull
 
+/* For HPT mode. */
+#define EA_BITS				64
+#define VA_BITS				68
+#define RA_BITS				51
+
+#define EA_ESID(ea, bits)		((ea) >> (bits))
+
+#define VA_VSID(hi, lo, bits)						\
+	(((lo) >> (bits)) | ((hi) << (64 - bits)))
+
+#define VA_HI_MASK			((1ull << (VA_BITS - 64)) - 1)
+
 /* Keeping PHDRS_BASE 0/NULL causes undefined behaviour wrt memcpy. */
 #define PHDRS_BASE			(void *)8
 #define PHDRS_NUM			3
 
 #define EA_TO_RA(v)			((uintptr_t)(v) - KVA_BASE)
 #define VA_TO_AVA(v)			((uintptr_t)(v) >> 23)
+
+#define _4KB_BITS			12
+#define _4KB				(1ull << _4KB_BITS)
+#define _4KB_MASK			(_4KB - 1)
 
 #define _64KB_BITS			16
 #define _64KB				(1ull << _64KB_BITS)
@@ -26,6 +42,10 @@
 #define _256MB_BITS			28
 #define _256MB				(1ull << _256MB_BITS)
 #define _256MB_MASK			(_256MB - 1)
+
+#define _1TB_BITS			40
+#define _1TB				(1ull << _1TB_BITS)
+#define _1TB_MASK			(_1TB - 1)
 
 /*
  * Fix base page size == actual page size == 64KB. This fixes the L||LP fields
@@ -39,21 +59,23 @@
 #define ACT_PGSZ_BITS			BASE_PGSZ_BITS
 #define ACT_PGSZ_MASK			BASE_PGSZ_MASK
 
-#define SEG_SZ				_256MB
-#define SEG_SZ_BITS			_256MB_BITS
-#define SEG_SZ_MASK			_256MB_MASK
-
 #define HASH_PRIMARY			0
 #define HASH_SECONDARY			1
 
-/*
- * These values are for 256MB segment translations. Also assumed is the fact
- * that we keep the virtual address size as 64bits.
- */
-#define HPTE_VA_HI_L			0
-#define HPTE_VA_HI_R			35
-#define HPTE_VA_LO_L			36
-#define HPTE_VA_LO_R			(63 - BASE_PGSZ_BITS)
+#define HPTE_256MB_VA_HI_L			0
+#define HPTE_256MB_VA_HI_R			35
+#define HPTE_256MB_VA_LO_L			36
+#define HPTE_256MB_VA_LO_R			(63 - BASE_PGSZ_BITS)
+
+#define HPTE_1TB_VA_HI_L			10
+#define HPTE_1TB_VA_HI_R			23
+#define HPTE_1TB_VA_MI_HI_L						\
+	(HPTE_1TB_VA_MI_HI_R - (VA_BITS - 64) + 1)
+#define HPTE_1TB_VA_MI_HI_R			63
+#define HPTE_1TB_VA_MI_LO_L			0
+#define HPTE_1TB_VA_MI_LO_R			23
+#define HPTE_1TB_VA_LO_L			24
+#define HPTE_1TB_VA_LO_R			(63 - BASE_PGSZ_BITS)
 
 #define PTCR_PATB_L			4
 #define PTCR_PATB_R			51
@@ -69,33 +91,36 @@
 #define HPARTE_HTABSZ_L			59
 #define HPARTE_HTABSZ_R			63
 
+#define SLBE_NUM			32
+
 /* In the format expected by slbmte and peers. */
-#define SLB_B_L				0
-#define SLB_B_R				1
-#define SLB_VSID_L			2
-#define SLB_VSID_R			51
-#define SLB_KS_L			52
-#define SLB_KS_R			52
-#define SLB_KP_L			53
-#define SLB_KP_R			53
-#define SLB_N_L				54
-#define SLB_N_R				54
-#define SLB_L_L				55
-#define SLB_L_R				55
-#define SLB_C_L				56
-#define SLB_C_R				56
-#define SLB_LP_L			58
-#define SLB_LP_R			59
+#define SLBE_B_L			0
+#define SLBE_B_R			1
+#define SLBE_VSID_L			2
+#define SLBE_VSID_R			51
+#define SLBE_KS_L			52
+#define SLBE_KS_R			52
+#define SLBE_KP_L			53
+#define SLBE_KP_R			53
+#define SLBE_N_L			54
+#define SLBE_N_R			54
+#define SLBE_L_L			55
+#define SLBE_L_R			55
+#define SLBE_C_L			56
+#define SLBE_C_R			56
+#define SLBE_LP_L			58
+#define SLBE_LP_R			59
 
-#define SLB_ESID_L			0
-#define SLB_ESID_R			35
-#define SLB_V_L				36
-#define SLB_V_R				36
-#define SLB_IX_L			52
-#define SLB_IX_R			63
+#define SLBE_ESID_L			0
+#define SLBE_ESID_R			35
+#define SLBE_V_L			36
+#define SLBE_V_R			36
+#define SLBE_IX_L			52
+#define SLBE_IX_R			63
 
-#define SLB_B_256MB			0
-#define SLB_LP_64KB			1
+#define SLBE_B_256MB			0
+#define SLBE_B_1TB			1
+#define SLBE_LP_64KB			1
 
 #define HPTE_AVA_L			12
 #define HPTE_AVA_R			56
@@ -157,12 +182,34 @@ enum {
 	UNIT_MAX
 };
 
+enum base_page_size {
+	BPS_4KB,
+	BPS_64KB,
+	BPS_MAX
+};
+
+enum seg_size {
+	SEGSZ_256MB,
+	SEGSZ_1TB,
+	SEGSZ_MAX
+};
+
+struct va {
+	uint64_t lo;
+	uint64_t hi;
+};
+
+/* rs, rb in the format expected my slbmte. */
 struct slbe {
-	uint64_t v[2];
+	uint64_t ea;	/* ea and va for quick access to abs values. */
+	struct va va;
+	uint64_t rs, rb;
+	uint64_t bps;
+	enum seg_size segsz;
 };
 
 struct as {
-	struct slbe slbe;
+	struct slbe slb[SLBE_NUM];
 	struct pteg *htab;
 	uint64_t hash_mask;
 	int htabsz;
