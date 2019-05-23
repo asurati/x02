@@ -9,9 +9,6 @@
 #include <mmu.h>
 #include <vmm.h>
 
-static const uint64_t seg_sizes[SEGSZ_MAX] = {_256MB, _1TB};
-static const uint64_t segsz_bits[SEGSZ_MAX] = {_256MB_BITS, _1TB_BITS};
-
 static void mmu_va_add(struct va *va, uint64_t off)
 {
 	uint64_t lo;
@@ -31,14 +28,14 @@ static uint64_t mmu_hash_mask(const struct as *as)
 }
 */
 
-static uint64_t mmu_va_hash(const struct as *as, enum seg_size segsz,
+static uint64_t mmu_va_hash(const struct as *as, uint64_t segsz,
 			    const struct va *va)
 {
 	uint64_t hi, lo, mi;
 
 	(void)as;
 
-	if (segsz == SEGSZ_256MB) {
+	if (segsz == _256MB) {
 		lo = bits_get(va->lo, HPTE_256MB_VA_LO);
 		hi = bits_get(va->hi, HPTE_256MB_VA_HI);
 		return hi ^ lo;
@@ -123,7 +120,9 @@ static int mmu_map(struct as *as, int ix, off_t off, uint64_t ra,
 	struct va va;
 	const struct slbe *slbe;
 
+	assert(ix < SLBE_NUM);
 	slbe = &as->slb[ix];
+
 	assert(ALIGNED(off, slbe->bps));
 	assert(ALIGNED(ra, slbe->bps));
 	sz = ALIGN_UP(sz, slbe->bps);
@@ -140,31 +139,42 @@ static int mmu_map(struct as *as, int ix, off_t off, uint64_t ra,
 	return 0;
 }
 
-/* Caller ascertains that each segment is disjoint. */
-static int mmu_create_segment(struct as *as, uint64_t ea, const struct va *va,
-			      enum base_page_size bps, enum seg_size segsz,
-			      char kp, char ks, char n)
+static int mmu_find_free_slbe(const struct as *as)
 {
-	int i, bits;
+	int i;
+
+	for (i = 0; i < SLBE_NUM; ++i)
+		if (!bits_get(as->slb[i].rs, SLBE_V))
+			break;
+	assert(i < SLBE_NUM);
+	return i;
+}
+
+/* Caller ascertains that each segment is disjoint. */
+static int mmu_create_segment(struct as *as, int ix, uint64_t ea,
+			      const struct va *va, uint64_t segsz,
+			      uint64_t bps, char kp, char ks, char n)
+{
+	int bits;
 	uint64_t esid, vsid, v, w;
 
-	assert(bps < BPS_MAX);
-	assert(segsz < SEGSZ_MAX);
+	assert(ix >= 0 && ix < SLBE_NUM);
+	assert(segsz == _256MB || segsz == _1TB);
+	assert(bps == _64KB);
 
-	assert(ALIGNED(ea, seg_sizes[segsz]));
-	assert(ALIGNED(va->lo, seg_sizes[segsz]));
+	assert(ALIGNED(ea, segsz));
+	assert(ALIGNED(va->lo, segsz));
 	assert((va->hi & (~VA_HI_MASK)) == 0);
 
 	v = w = 0;
 
-	bits = segsz_bits[segsz];
+	bits = segsz == _256MB ? _256MB_BITS : _1TB_BITS;
 	esid = EA_ESID(ea, bits);
 	vsid = VA_VSID(va->hi, va->lo, bits);
 
 	v |= bits_set(SLBE_VSID, vsid);
-	if (bps == BPS_64KB)
-		v |= bits_on(SLBE_L) | bits_set(SLBE_LP, SLBE_LP_64KB);
-	if (segsz == SEGSZ_1TB)
+	v |= bits_on(SLBE_L) | bits_set(SLBE_LP, SLBE_LP_64KB);
+	if (segsz == _1TB)
 		v |= bits_set(SLBE_B, SLBE_B_1TB);
 	if (kp)
 		v |= bits_on(SLBE_KP);
@@ -175,23 +185,15 @@ static int mmu_create_segment(struct as *as, uint64_t ea, const struct va *va,
 
 	w |= bits_set(SLBE_ESID, esid);
 	w |= bits_on(SLBE_V);
+	w |= bits_set(SLBE_IX, ix);
 
-	for (i = 0; i < SLBE_NUM; ++i)
-		if (!bits_get(as->slb[i].rs, SLBE_V))
-			break;
-	assert(i < SLBE_NUM);
-	w |= bits_set(SLBE_IX, i);
-
-	as->slb[i].rs = v;
-	as->slb[i].rb = w;
-	as->slb[i].va = *va;
-	as->slb[i].ea = ea;
-	as->slb[i].segsz = segsz;
-	if (bps == BPS_4KB)
-		as->slb[i].bps = _4KB;
-	else
-		as->slb[i].bps = _64KB;
-	return i;
+	as->slb[ix].rs = v;
+	as->slb[ix].rb = w;
+	as->slb[ix].va = *va;
+	as->slb[ix].ea = ea;
+	as->slb[ix].segsz = segsz;
+	as->slb[ix].bps = bps;
+	return 0;
 }
 
 void mmu_init(struct as *as)
@@ -248,9 +250,10 @@ void mmu_init(struct as *as)
 	 * RA 0x0000.... for the vmm.
 	 */
 
+	ix = mmu_find_free_slbe(as);
 	ea = va.lo = KVA_BASE;	/* ea == va for this segment. */
 	va.hi = 0;
-	ix = mmu_create_segment(as, ea, &va, BPS_64KB, SEGSZ_256MB, 1, 0, 0);
+	mmu_create_segment(as, ix, ea, &va, _256MB, _64KB, 1, 0, 0);
 
 	/* Map segments of the vmm binary. */
 	ph = (const struct elf64_phdr *)PHDRS_BASE;
@@ -272,6 +275,8 @@ void mmu_init(struct as *as)
 	sz = &_htab_end - &_htab_org;
 	ra = EA_TO_RA(&_htab_org);
 	mmu_map(as, ix, off, ra, sz, 6);	/* rw- */
+
+	/*mmu_map_part();*/
 
 	slbmte(as->slb[ix].rs, as->slb[ix].rb);
 
