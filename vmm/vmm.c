@@ -13,7 +13,7 @@ void vmm_part_init()
 {
 	extern char _parttab_org[];	/* [] to prevent -Warray-bounds */
 	extern char _parttab_end[];
-	extern char _htab_org;
+	extern char _htab_org, _htab1_org;
 	struct part_entry *pe;
 	uint64_t v, w, ptab;
 	size_t sz;
@@ -38,8 +38,11 @@ void vmm_part_init()
 	pe->v[0]  = v;
 	pe->v[1]  = 0;
 
-	/* Dummy, possibly invalid values for LPID == 1. */
-	pe[1].v[0] = -1;
+	/* Fill PATE for LPID == 1. */
+	w = EA_TO_RA(&_htab1_org);
+	w >>= 18;
+	v = bits_set(HPARTE_HTABORG, w) | bits_set(HPARTE_VRMA_PS, 5);
+	pe[1].v[0] = v;
 	pe[1].v[1] = 0;
 
 	mfspr(v, SPR_LPCR);
