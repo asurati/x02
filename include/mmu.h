@@ -91,7 +91,7 @@
 #define HPARTE_HTABSZ_L			59
 #define HPARTE_HTABSZ_R			63
 
-#define SLBE_NUM			32
+#define SLBE_NUM			(32 + 1)
 
 /* In the format expected by slbmte and peers. */
 #define SLBE_B_L			0
@@ -182,18 +182,6 @@ enum {
 	UNIT_MAX
 };
 
-enum base_page_size {
-	BPS_4KB,
-	BPS_64KB,
-	BPS_MAX
-};
-
-enum seg_size {
-	SEGSZ_256MB,
-	SEGSZ_1TB,
-	SEGSZ_MAX
-};
-
 struct va {
 	uint64_t lo;
 	uint64_t hi;
@@ -205,7 +193,7 @@ struct slbe {
 	struct va va;
 	uint64_t rs, rb;
 	uint64_t bps;
-	enum seg_size segsz;
+	uint64_t segsz;
 };
 
 struct as {
