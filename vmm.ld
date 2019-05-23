@@ -99,6 +99,10 @@ SECTIONS
 		_htab_org = .;
 		. += 0x40000;
 		_htab_end = .;
+		_htab1_org = .;
+		. += 0x40000;
+		_htab1_end = .;
+		_ram1_org = .;
 	}
 	_end = .;
 }
