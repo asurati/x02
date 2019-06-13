@@ -292,7 +292,10 @@ void mmu_init(struct as *as)
 	tlbsync();
 	ptesync();
 
-	/* Linux kernel fills in srr0/1 and then executes rfid. */
+	/*
+	 * Linux kernel fills in srr0/1 and then executes rfid.
+	 * See start_here_multiplatform.
+	 */
 	mtmsr(v);
 	return;
 }
